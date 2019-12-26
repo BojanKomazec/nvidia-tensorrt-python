@@ -49,6 +49,7 @@
 
 import os
 import ctypes
+import cv2
 import time
 import sys
 import argparse
@@ -183,6 +184,25 @@ def parse_commandline_arguments():
     return args
 
 def main():
+    print("OpenCV version: " + cv2.__version__)
+    cap = cv2.VideoCapture(1)
+    _,cv2_im = cap.read()
+
+    # height, width, number of channels in image
+    height = cv2_im.shape[0]
+    width = cv2_im.shape[1]
+    channels = cv2_im.shape[2]
+
+    print('Image Dimension    : ',cv2_im.shape)
+    print('Image Height       : ',height)
+    print('Image Width        : ',width)
+    print('Number of Channels : ',channels)
+
+    cv2_im = cv2.cvtColor(cv2_im,cv2.COLOR_BGR2RGB)
+    pil_im = Image.fromarray(cv2_im)
+    pil_im.show()
+    # sys.exit(0)
+
     # Parse command line arguments
     args = parse_commandline_arguments()
 
@@ -214,27 +234,57 @@ def main():
         trt_engine_datatype=args.trt_engine_datatype,
         batch_size=args.max_batch_size)
 
-    # Start measuring time
-    inference_start_time = time.time()
+    while True:
+        _,cv2_im = cap.read()
 
-    # Get TensorRT SSD model output
-    detection_out, keep_count_out = \
-        trt_inference_wrapper.infer(args.input_img_path)
+        cv2_im = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+        img_pil = Image.fromarray(cv2_im)
+        image_np = trt_inference_wrapper.preprocess_img(img_pil)
 
-    # Make PIL.Image for drawing bounding boxes and
-    # let analyze_prediction() draw them based on model output
-    img_pil = Image.open(args.input_img_path)
-    prediction_fields = len(TRT_PREDICTION_LAYOUT)
-    for det in range(int(keep_count_out[0])):
-        analyze_prediction(detection_out, det * prediction_fields, img_pil)
+        # Start measuring time
+        # inference_start_time = time.time()
 
-    # Output total [img load + inference + drawing bboxes] time
-    print("Total time taken for one image: {} ms\n".format(
-        int(round((time.time() - inference_start_time) * 1000))))
+        # Get TensorRT SSD model output
+        detection_out, keep_count_out = \
+            trt_inference_wrapper.infer_preprocessed_image(image_np)
+        # print("detection_out = " + detection_out)
 
-    # Save output image and output path
-    img_pil.save(args.output)
-    print("Saved output image to: {}".format(args.output))
+        # Make PIL.Image for drawing bounding boxes and
+        # let analyze_prediction() draw them based on model output
+        # img_pil = Image.open(args.input_img_path)
+        prediction_fields = len(TRT_PREDICTION_LAYOUT)
+        for det in range(int(keep_count_out[0])):
+            analyze_prediction(detection_out, det * prediction_fields, img_pil)
+
+        # Output total [img load + inference + drawing bboxes] time
+        # print("Total time taken for one image: {} ms\n".format(
+            # int(round((time.time() - inference_start_time) * 1000))))
+
+        # Save output image and output path
+        # img_pil.save(args.output)
+        # print("Saved output image to: {}".format(args.output))
+
+        # Visualization of the results of a detection.
+        # vis_util.visualize_boxes_and_labels_on_image_array(
+        #     image_np,
+        #     np.squeeze(boxes),
+        #     np.squeeze(classes).astype(np.int32),
+        #     np.squeeze(scores),
+        #     category_index,
+        #     use_normalized_coordinates=True,
+        #     line_thickness=8)
+
+        # # Display output
+        # out_pil_img = Image.fromarray(image_np[0])
+        # out_pil_img.show('object detection')
+        # pil_im.show('object detection')
+        # cv2.imshow('object detection', cv2.resize(image_np, (height, 600)))
+        cv_img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+        cv2.imshow('object detection', cv_img)
+
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            cv2.destroyAllWindows()
+            break
 
 
 if __name__ == '__main__':

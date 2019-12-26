@@ -143,6 +143,16 @@ class TRTInference(object):
 
         # Load image into CPU
         img = self._load_img(image_path)
+        return self.infer_preprocessed_image(img)
+
+
+    # B.Komazec
+    def infer_preprocessed_image(self, img):
+        """Infers model on given image.
+
+        Args:
+            image (???): preprocessed image loaded into CPU to run object detection model on
+        """
 
         # Copy it into appropriate place into memory
         # (self.inputs was returned earlier by allocate_buffers())
@@ -206,9 +216,8 @@ class TRTInference(object):
             self.numpy_array[idx] = img_np
         return self.numpy_array
 
-
-    def _load_img(self, image_path):
-        image = Image.open(image_path)
+    # B.Komazec
+    def preprocess_img(self, image):
         model_input_width = model_utils.ModelData.get_input_width()
         model_input_height = model_utils.ModelData.get_input_height()
         # Note: Bilinear interpolation used by Pillow is a little bit
@@ -227,6 +236,10 @@ class TRTInference(object):
         img_np = img_np.ravel()
         return img_np
 
+    # B.Komazec
+    def _load_img(self, image_path):
+        image = Image.open(image_path)
+        return preprocess_img(image)
 
 # This class is similar as TRTInference inference, but it manages Tensorflow
 class TensorflowInference(object):
