@@ -140,7 +140,7 @@ def parse_commandline_arguments():
 
     # Define script command line arguments
     parser = argparse.ArgumentParser(description='Run object detection inference on input image.')
-    parser.add_argument('input_img_path', metavar='INPUT_IMG_PATH',
+    parser.add_argument('--input_img_path', metavar='INPUT_IMG_PATH',
         help='an image file to run inference on')
     parser.add_argument('-p', '--precision', type=int, choices=[32, 16], default=32,
         help='desired TensorRT float precision to build an engine with')
@@ -153,6 +153,10 @@ def parse_commandline_arguments():
     parser.add_argument("-o", "--output",
         help="path of the output file",
         default=os.path.join(PATHS.get_sample_root(), "image_inferred.jpg"))
+    parser.add_argument('-c', '--camera_index', type=int, default=0,
+        help='/dev/cameraN index')
+    parser.add_argument('--test_camera', action="store_true",
+        help='Only test camera')
 
     # Parse arguments passed
     args = parser.parse_args()
@@ -183,28 +187,42 @@ def parse_commandline_arguments():
 
     return args
 
+# Test video capture
+def test_camera(camera_index):
+        cap = cv2.VideoCapture(camera_index)
+        success, frame = cap.read()
+        if not success:
+            print("ERROR: Failed to capture the next frame")
+            sys.exit(0)
+
+        # height, width, number of channels in image
+        height = frame.shape[0]
+        width = frame.shape[1]
+        channels = frame.shape[2]
+
+        print('Image Dimension    : ',frame.shape)
+        print('Image Height       : ',height)
+        print('Image Width        : ',width)
+        print('Number of Channels : ',channels)
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_im = Image.fromarray(frame)
+        pil_im.show()
+
+        cap.release()
+        cv2.destroyAllWindows()
+
+
 def main():
     print("OpenCV version: " + cv2.__version__)
-    cap = cv2.VideoCapture(1)
-    _,cv2_im = cap.read()
-
-    # height, width, number of channels in image
-    height = cv2_im.shape[0]
-    width = cv2_im.shape[1]
-    channels = cv2_im.shape[2]
-
-    print('Image Dimension    : ',cv2_im.shape)
-    print('Image Height       : ',height)
-    print('Image Width        : ',width)
-    print('Number of Channels : ',channels)
-
-    cv2_im = cv2.cvtColor(cv2_im,cv2.COLOR_BGR2RGB)
-    pil_im = Image.fromarray(cv2_im)
-    pil_im.show()
-    # sys.exit(0)
 
     # Parse command line arguments
     args = parse_commandline_arguments()
+    print("Video capture on camera: {}".format(args.camera_index))
+
+    if args.test_camera:
+        test_camera(args.camera_index)
+        sys.exit(0)
 
     # Loading FlattenConcat plugin library using CDLL has a side
     # effect of loading FlattenConcat plugin into internal TensorRT
@@ -234,11 +252,18 @@ def main():
         trt_engine_datatype=args.trt_engine_datatype,
         batch_size=args.max_batch_size)
 
-    while True:
-        _,cv2_im = cap.read()
 
-        cv2_im = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-        img_pil = Image.fromarray(cv2_im)
+    cap = cv2.VideoCapture(args.camera_index)
+
+    while cap.isOpened():
+        success, frame = cap.read()
+
+        if not success:
+            print("ERROR: Failed to capture the next frame")
+            break
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img_pil = Image.fromarray(frame)
         image_np = trt_inference_wrapper.preprocess_img(img_pil)
 
         # Start measuring time
@@ -285,7 +310,6 @@ def main():
         if cv2.waitKey(25) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break
-
 
 if __name__ == '__main__':
     main()
