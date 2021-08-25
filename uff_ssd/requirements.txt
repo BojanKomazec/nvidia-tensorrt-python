@@ -31,7 +31,7 @@ requests==2.22.0
 six==1.13.0
 tensorboard==1.15.0
 tensorflow-estimator==1.15.1
-tensorflow-gpu==1.15.0+nv19.12.tf1
+tensorflow-gpu==2.5.1
 tensorrt==5.1.6.1
 termcolor==1.1.0
 testresources==2.0.1
